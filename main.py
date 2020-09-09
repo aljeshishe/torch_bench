@@ -1,13 +1,13 @@
 from __future__ import print_function
 import argparse
-import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torch.optim.lr_scheduler import StepLR
 
+import time
+from tqdm import tqdm
 
 class Net(nn.Module):
     def __init__(self):
@@ -34,41 +34,24 @@ class Net(nn.Module):
         output = F.log_softmax(x, dim=1)
         return output
 
-
-def train(args, model, device, train_loader, optimizer, epoch):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
-            if args.dry_run:
-                break
-
-
-def test(model, device, test_loader):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
-
-    test_loss /= len(test_loader.dataset)
-
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+#
+# def test(model, device, test_loader):
+#     model.eval()
+#     test_loss = 0
+#     correct = 0
+#     with torch.no_grad():
+#         for data, target in test_loader:
+#             data, target = data.to(device), target.to(device)
+#             output = model(data)
+#             test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
+#             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+#             correct += pred.eq(target.view_as(pred)).sum().item()
+#
+#     test_loss /= len(test_loader.dataset)
+#
+#     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+#         test_loss, correct, len(test_loader.dataset),
+#         100. * correct / len(test_loader.dataset)))
 
 
 def main():
@@ -90,18 +73,17 @@ def main():
                         help='quickly check a single pass')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--save-model', action='store_true', default=False,
-                        help='For Saving the current Model')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     torch.manual_seed(args.seed)
+    torch.set_num_threads(16)
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    kwargs = {'batch_size': args.batch_size}
+    kwargs = {'batch_size': args.batch_size, 'num_workers': 16}
     if use_cuda:
         kwargs.update({'num_workers': 1,
                        'pin_memory': True,
@@ -120,24 +102,30 @@ def main():
     test_loader = torch.utils.data.DataLoader(dataset2, **kwargs)
 
     model = Net()
-    if torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-        model = nn.DataParallel(model)
     model.to(device)
 
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
 
-    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     start = time.time()
-    for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch)
-        test(model, device, test_loader)
-        scheduler.step()
-    end = time.time()
-    print(f'Time left {end-start}')
-    if args.save_model:
-        torch.save(model.state_dict(), "mnist_cnn.pt")
+    duration = 30
+    model.train()
+
+    for batch_idx, (data, target) in enumerate(train_loader):
+        if start + duration < time.time():
+            print(f'{duration} seconds passed. {batch_idx} done. Throughput: {batch_idx/duration:.3f} (loss: {loss.item():.3f})')
+            break
+        data, target = data.to(device), target.to(device)
+        optimizer.zero_grad()
+        output = model(data)
+        loss = F.nll_loss(output, target)
+        loss.backward()
+        optimizer.step()
+        # if batch_idx % args.log_interval == 0:
+        #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+        #         epoch, batch_idx * len(data), len(train_loader.dataset),
+        #         100. * batch_idx / len(train_loader), loss.item()))
+        #     if args.dry_run:
+        #         break
 
 
 if __name__ == '__main__':
