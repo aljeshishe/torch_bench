@@ -9,6 +9,7 @@ from torchvision import datasets, transforms
 import time
 from tqdm import tqdm
 
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -34,6 +35,7 @@ class Net(nn.Module):
         output = F.log_softmax(x, dim=1)
         return output
 
+
 #
 # def test(model, device, test_loader):
 #     model.eval()
@@ -56,7 +58,9 @@ class Net(nn.Module):
 
 def main():
     # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser = argparse.ArgumentParser(description='PyTorch MNIST benchmark for cpu/gpu')
+    parser.add_argument('-d', '--duration', type=int, default=30, metavar='N',
+                        help='benchmark duration')
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
@@ -65,53 +69,43 @@ def main():
                         help='number of epochs to train (default: 1)')
     parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
                         help='learning rate (default: 1.0)')
-    parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
-                        help='Learning rate step gamma (default: 0.7)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
-    parser.add_argument('--dry-run', action='store_true', default=False,
-                        help='quickly check a single pass')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
-                        help='how many batches to wait before logging training status')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     torch.manual_seed(args.seed)
-    torch.set_num_threads(16)
+    torch.set_num_threads(12)
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    kwargs = {'batch_size': args.batch_size, 'num_workers': 16}
+    kwargs = {'batch_size': args.batch_size, 'num_workers': 1}
     if use_cuda:
         kwargs.update({'num_workers': 1,
                        'pin_memory': True,
                        'shuffle': True},
-                     )
+                      )
 
-    print(f'using: {device}')
+    print(f'Benchmarking using: {device}')
 
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
-        ])
+    ])
     dataset1 = datasets.MNIST('../data', train=True, download=True, transform=transform)
-    dataset2 = datasets.MNIST('../data', train=False, transform=transform)
-    train_loader = torch.utils.data.DataLoader(dataset1,**kwargs)
-    test_loader = torch.utils.data.DataLoader(dataset2, **kwargs)
-
+    train_loader = torch.utils.data.DataLoader(dataset1, **kwargs)
     model = Net()
     model.to(device)
 
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
 
     start = time.time()
-    duration = 30
     model.train()
 
-    for batch_idx, (data, target) in enumerate(train_loader):
-        if start + duration < time.time():
+    for batch_idx, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
+        if start + args.duration < time.time():
             break
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -119,16 +113,17 @@ def main():
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
-        # if batch_idx % args.log_interval == 0:
-        #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-        #         epoch, batch_idx * len(data), len(train_loader.dataset),
-        #         100. * batch_idx / len(train_loader), loss.item()))
-        #     if args.dry_run:
-        #         break
-
 
     passed = time.time() - start
-    print(f'{passed} seconds passed. {batch_idx} done. Throughput: {batch_idx / passed:.3f} (loss: {loss.item():.3f})')
+    print(f'{passed:.3f}secs passed. {batch_idx} done. loss: {loss.item():.3f}\n')
+    results = {'i7-8550U 12thr(baseline)': 13.259, 'Tesla T4': 72.437, 'GRID V100D-32C with 75% already load': 100.792,
+               'current': batch_idx / passed}
+    from tabulate import tabulate
+    baseline = next(iter(results.values()))
+    table = [[name, value, value / baseline * 100] for name, value in results.items()]
+    headers = ['name', 'it/s', 'Index']
+    print(tabulate(table, headers, floatfmt='.3f'))
+
 
 if __name__ == '__main__':
     main()
