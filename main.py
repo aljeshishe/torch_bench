@@ -112,7 +112,6 @@ def main():
 
     for batch_idx, (data, target) in enumerate(train_loader):
         if start + duration < time.time():
-            print(f'{duration} seconds passed. {batch_idx} done. Throughput: {batch_idx/duration:.3f} (loss: {loss.item():.3f})')
             break
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -127,6 +126,9 @@ def main():
         #     if args.dry_run:
         #         break
 
+
+    passed = time.time() - start
+    print(f'{passed} seconds passed. {batch_idx} done. Throughput: {batch_idx / passed:.3f} (loss: {loss.item():.3f})')
 
 if __name__ == '__main__':
     main()
