@@ -1,4 +1,4 @@
-# Basic MNIST Example
+# PyTorch MNIST benchmark for cpu/gpu
 
 ```bash
 pip install -r requirements.txt

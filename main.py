@@ -116,12 +116,14 @@ def main():
 
     passed = time.time() - start
     print(f'{passed:.3f}secs passed. {batch_idx} done. loss: {loss.item():.3f}\n')
-    results = {'i7-8550U 12thr(baseline)': 13.259, 'Tesla T4': 72.437, 'GRID V100D-32C with 75% already load': 100.792,
+    results = {'i7-8550U 12thr(baseline)': 13.259,
+               'Tesla T4': 72.437,
+               'GRID V100D-32C with 75% already load': 100.792,
                'current': batch_idx / passed}
     from tabulate import tabulate
     baseline = next(iter(results.values()))
     table = [[name, value, value / baseline * 100] for name, value in results.items()]
-    headers = ['name', 'it/s', 'Index']
+    headers = ['name', 'it/s', '% to baseline']
     print(tabulate(table, headers, floatfmt='.3f'))
 
 
