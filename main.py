@@ -104,7 +104,7 @@ def main():
     start = time.time()
     model.train()
 
-    for batch_idx, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
+    for batch_idx, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader), mininterval=2):
         if start + args.duration < time.time():
             break
         data, target = data.to(device), target.to(device)
@@ -117,8 +117,10 @@ def main():
     passed = time.time() - start
     print(f'{passed:.3f}secs passed. {batch_idx} done. loss: {loss.item():.3f}\n')
     results = {'i7-8550U 12thr(baseline)': 13.259,
+               'Xeon(R) Gold 6154 CPU(MTS)64 cores': 58.704,
                'Tesla T4': 72.437,
-               'GRID V100D-32C with 75% already load': 100.792,
+               'GRID V100D-32C with 75% already load': 114.382,
+               'Tesla K80': 48.804,
                'current': batch_idx / passed}
     from tabulate import tabulate
     baseline = next(iter(results.values()))
