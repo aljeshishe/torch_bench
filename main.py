@@ -80,6 +80,8 @@ def main():
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     print(f'Benchmarking using: {device}')
+    if use_cuda:
+        print(f'Device: {torch.cuda.get_device_name(0)}')
 
     train_loader = Dataset(shape=(1, 28, 28), batch_size=args.batch_size, count=10000, device=device)
     model = Net()
@@ -102,11 +104,11 @@ def main():
 
     passed = time.time() - start
     print(f'{passed:.3f}secs passed. {batch_idx} done. loss: {loss.item():.3f}\n')
-    results = {'i7-8550U 12thr(baseline)': 13.259,
-               'Xeon(R) Gold 6154 CPU(MTS)64 cores': 58.704,
-               'Tesla T4': 72.437,
-               'GRID V100D-32C with 75% already load': 114.382,
-               'Tesla K80': 48.804,
+    results = {'i7-8550U 12thr(baseline)': 0.512,
+               'NVIDIA GeForce RTX 2080 Ti': 15.058,
+               '2g.10Gb': 31.220,
+               '1g.5Gb': 15.319,
+               'A100': 114.114,
                'current': batch_idx / passed}
     from tabulate import tabulate
     baseline = next(iter(results.values()))
