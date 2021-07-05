@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
 
 import time
 from tqdm import tqdm
@@ -13,8 +12,8 @@ from tqdm import tqdm
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, 1)
-        self.conv2 = nn.Conv2d(32, 64, 3, 1)
+        self.conv1 = nn.Conv2d(1, 640, 3, 1)
+        self.conv2 = nn.Conv2d(640, 64, 3, 1)
         self.dropout1 = nn.Dropout2d(0.25)
         self.dropout2 = nn.Dropout2d(0.5)
         self.fc1 = nn.Linear(9216, 128)
@@ -36,24 +35,25 @@ class Net(nn.Module):
         return output
 
 
-#
-# def test(model, device, test_loader):
-#     model.eval()
-#     test_loss = 0
-#     correct = 0
-#     with torch.no_grad():
-#         for data, target in test_loader:
-#             data, target = data.to(device), target.to(device)
-#             output = model(data)
-#             test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-#             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-#             correct += pred.eq(target.view_as(pred)).sum().item()
-#
-#     test_loss /= len(test_loader.dataset)
-#
-#     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-#         test_loss, correct, len(test_loader.dataset),
-#         100. * correct / len(test_loader.dataset)))
+class Dataset:
+
+    def __init__(self, shape, batch_size, count, device):
+        self.shape = shape
+        self.batch_size = batch_size
+        self.count = count
+        self.device = device
+
+    def __len__(self):
+        return self.count
+
+    def __iter__(self):
+        return self._iter()
+
+    def _iter(self):
+        for i in range(self.count):
+            img_tensor = torch.rand(size=[self.batch_size] + list(self.shape), device=self.device)
+            targets_tensor = torch.randint(low=0, high=10, size=(self.batch_size,), device=self.device)
+            yield img_tensor, targets_tensor
 
 
 def main():
@@ -74,28 +74,14 @@ def main():
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     args = parser.parse_args()
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
 
-    torch.manual_seed(args.seed)
     torch.set_num_threads(12)
 
+    use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-
-    kwargs = {'batch_size': args.batch_size, 'num_workers': 1}
-    if use_cuda:
-        kwargs.update({'num_workers': 1,
-                       'pin_memory': True,
-                       'shuffle': True},
-                      )
-
     print(f'Benchmarking using: {device}')
 
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
-    dataset1 = datasets.MNIST('../data', train=True, download=True, transform=transform)
-    train_loader = torch.utils.data.DataLoader(dataset1, **kwargs)
+    train_loader = Dataset(shape=(1, 28, 28), batch_size=args.batch_size, count=10000, device=device)
     model = Net()
     model.to(device)
 
