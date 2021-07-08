@@ -105,10 +105,15 @@ def main():
     passed = time.time() - start
     print(f'{passed:.3f}secs passed. {batch_idx} done. loss: {loss.item():.3f}\n')
     results = {'i7-8550U 12thr(baseline)': 0.512,
-               'NVIDIA GeForce RTX 2080 Ti': 15.058,
+               'Tesla T4': 15.673,
+               'NVIDIA GeForce RTX 2080 Ti': 25.149,
+               'TITAN RTX': 28.133,
+               'A100': 114.114,
+               'A100 2 DP': 142.715,
+               'A100 DDP each': 107.919,
+               '4g.20Gb': 62.460,
                '2g.10Gb': 31.220,
                '1g.5Gb': 15.319,
-               'A100': 114.114,
                'current': batch_idx / passed}
     from tabulate import tabulate
     baseline = next(iter(results.values()))
